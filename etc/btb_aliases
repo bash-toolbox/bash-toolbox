@@ -1,0 +1,17 @@
+alias ll="ls -al"
+alias ..="cd .."
+
+alias chrome="/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome"
+alias studio="/CLOUD/DevApps/Android/Android\ Studio.app/Contents/MacOS/studio"
+
+alias j="jekyll server --incremental --watch --livereload"
+alias i="ionic serve -c --browser chrome"
+alias d=direnv_cli
+
+alias 2cloud="cd /Users/Shared/CLOUD"
+alias 2ionic="cd /Users/Shared/CLOUD/Development.Ionic"
+alias 2angular="cd /Users/Shared/CLOUD/Development.Angular"
+alias 2fullstack="cd /Users/Shared/CLOUD/Development.FullStackDeveloper/Repositories.FromGithub/repositories/"
+
+alias git_rm="git rm $(git status | grep deleted: | cut -d: -f2)"
+alias git_add="git add $(git status | grep deleted: | cut -d: -f2)"

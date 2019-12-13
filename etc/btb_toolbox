@@ -1,0 +1,222 @@
+#!/bin/bash
+#vim: tabstop=4:
+
+#==============================================================================
+# Erstellung: Ralph Göstenmeier, 13.04.2016
+#------------------------------------------------------------------------------
+    __DEPLOY_VERSION=2.00.01-02
+    __DEPLOY_TIMESTAMP="2016-11-07 16:28:25"
+
+    __DEPLOY_TARGET="common"
+    __DEPLOY_SCRIPTNAME="bash_toolbox"
+
+
+#------------------------------------------------------------------------------
+# Insert following lines to use this bash toolbox
+#------------------------------------------------------------------------------
+#        HERE=$(cd "$(dirname $0)"; pwd)
+#        SELF=${0##*/}
+
+#        # PILOT = /sas/crm/projekte/PR_2016/NPS_Pilotprojekt/Implementierung
+#        _P=${HERE%/nps_pilot/*}/nps_pilot
+#        _E=${HERE##*/nps_pilot/}
+#        _E=${_E%%/*}
+#
+#        NPS_ROOT=$_P/$_E
+#
+#        . $NPS_ROOT/etc/bash_toolbox
+
+#------------------------------------------------------------------------------
+# Globale Variable definieren
+#------------------------------------------------------------------------------
+
+# -- Return Codes -------------------------------------------------------------
+export RC_SCOPEDATA_NO_IMPORT=101
+export RC_SCOPEDATA_HAS_IMPORT=102
+
+# -- Farben -------------------------------------------------------------------
+fg_black=30
+fg_red=31
+fg_green=32
+fg_yellow=33
+fg_blue=34
+fg_magenta=35
+fg_cyan=36
+fg_white=37
+
+bg_black=40
+bg_red=41
+bg_green=42
+bg_yellow=43
+bg_blue=44
+bg_magenta=45
+bg_cyan=46
+bg_white=47
+
+function COLORIZE()
+{
+    local _LINE; _LINE="$1"; shift
+    local _COLR; _COLR="${1:-RED}"
+
+    case "$_COLR" in
+        "RED")          _COLR_ON="0;31"						; _COLR_OFF=0   ;;
+        "RED_INVERS")   _COLR_ON="0;41"						; _COLR_OFF=0   ;;
+        "GREEN")        _COLR_ON="0;32"						; _COLR_OFF=0   ;;
+        "GREEN_INVERS") _COLR_ON="0;42"						; _COLR_OFF=0   ;;
+        "HEADER")		_COLR_ON="${fg_white};${bg_blue}"	; _COLR_OFF=0   ;;	# white blue
+        "INVERS")       _COLR_ON=7							; _COLR_OFF=27  ;;
+        *)              _COLR_ON=7							; _COLR_OFF=0   ;;
+    esac
+
+    echo -n -e '\e['${_COLR_ON}'m'
+    echo -n -e "${_LINE}"
+
+	if [[ $_COLR == "HEADER" ]]; then
+		echo -n -e '\e[K'
+	fi
+
+    echo -n -e '\e['${_COLR_OFF}'m'
+}
+
+function BASE_LOG()
+{
+	local __GRP ; __GRP=$1			  ; shift
+	local __LINE; __LINE=$1			  ; shift
+	local __PFIX; __PFIX=${1:-MISSING}; shift
+	local __TYPE; __TYPE=${1:-MISSING}; shift
+	local __SID ; __SID=${1:-MISSING} ; shift
+
+	[[ $__PFIX == MISSING ]] && __PFIX=""
+
+	# :         11111111112222222222333333333344444444445555555555666
+	# :12345678901234567890123456789012345678901234567890123456789012
+	# :RUN                                                        | :
+    # :DBG | :                                        0 |  / 4| d
+    # :OUT |TEST                                                  |normal text
+    # :OUT |NPS root directory                                    |NPS_ROOT  
+
+	if [[ $__SID = MISSING ]]; then
+		__SID="---::--"
+	fi
+
+	__PFIX=$(printf "$__GRP |%3s|%-50s" "$__SID" "$__PFIX")
+
+	__OUTPUT="$__PFIX|$__LINE"
+	if [[ -t 2 ]]; then 
+		#  TERMINAL
+		if [[ "$__TYPE" == "HEADER" ]]; then
+			__OUTPUT="$(COLORIZE "$__PFIX|$__LINE" HEADER)"
+		fi
+	else
+		: # REDIRECTED
+	fi
+
+	echo "$__OUTPUT" >&2
+}
+
+function ERROR() {
+	local __MSG; __MSG=$1
+	local __ERR; __ERR=${2:-1}
+
+	BASE_LOG "ERR" "$__MSG" ""						 >&2
+
+	if [[ $__ERR == NOEXIT ]]; then
+		:
+	else
+		exit $__ERR
+	fi
+}
+
+OPT_DEBUGLEVEL=0
+function DEBUG() {
+	local __LEVEL; __LEVEL=$1;			 shift
+	local __LINE;  __LINE=$1;			 shift
+	local __PFIX;  __PFIX=${1:-MISSING}; shift
+	local __TYPE;  __TYPE=${1:-MISSING}; shift
+	local __SID ;  __SID=${1:-MISSING} ; shift
+
+	__LEVEL=${__LEVEL%,}	# remove comma to allow calls like DEBUG 2, "Text"
+
+	if [ $__LEVEL -le $OPT_DEBUGLEVEL ]; then
+		BASE_LOG "DBG" "$__LINE" "$__PFIX" "$__TYPE" "$__SID" >&2	
+	fi
+}
+
+function DEBUG_RUN() {
+    local __LEVL; __LEVL=$1;           shift
+    local __LINE;  __LINE=$1;            shift
+	local __PFIX;  __PFIX=${1:-MISSING}; shift
+
+	DEBUG $__LEVL "$__LINE" "$__PFIX" "" "###"
+}
+
+function DEBUG_PARAM(){
+    local __LVL; __LVL="$1"
+    local __VAR; __VAR="$2"
+    local __VAL; __VAL="$3"
+	local __PFX; __PFX="${4:-MISSING}"
+
+    __LVL=${__LVL%,}    # remove comma to allow calls like DEBUG 2, "Text"
+
+    if [ $__LVL -le $OPT_DEBUGLEVEL ]; then
+		__LINE="$(printf "%-20s = %s" "$__VAR" "$__VAL")"
+
+        BASE_LOG "DBG" "$__LINE" "$__PFX" >&2
+    fi
+}
+
+function VERBOSE() {
+	local __LINE  ; __LINE=$1; shift
+	local __PFIX; __PFIX=${1:-MISSING}; shift
+
+	if [[ $OPT_VERBOSE == YES ]]; then
+		BASE_LOG "RUN" "$__LINE" "$__PFIX"
+	else
+		DEBUG 1 "$__LINE" "$HEAD"
+	fi
+}
+
+function PRINT() {
+    local __LINE; __LINE=$1; shift
+    local __PFIX; __PFIX=${1:-MISSING}; shift
+    local __TYPE; __TYPE=${1:-MISSING}; shift
+
+    if [[ $OPT_VERBOSE == YES ]]; then
+        BASE_LOG "RUN" "$__LINE" "$__PFIX" "$__TYPE"
+    fi
+}
+
+function TITLE() {
+    local __LINE; __LINE=$1; shift
+    local __PFIX; __PFIX=${1:-MISSING}; shift
+
+    PRINT "$__LINE" "$__PFIX" "HEADER"
+}
+
+
+function PRINTC()
+{
+    local _LINE; _LINE="$1"; shift
+    local _COLR; _COLR="${1:-RED}"
+
+    _LINE="$(COLORIZE "$_LINE" "$_COLR")"
+
+    echo "$_LINE"
+}
+
+
+#------------------------------------------------------------------------------
+# 
+#------------------------------------------------------------------------------
+function RUN() {
+	local _CMD; _CMD="$@"
+
+	if [[ ${OPT_MODE^^} == "TEST" ]]; then
+		BASE_LOG "RUN" "$_CMD" >&2
+	else
+		$_CMD
+	fi
+
+	#BASE_LOG "RUN" "" "DONE"
+}
+
